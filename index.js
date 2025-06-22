@@ -6,6 +6,7 @@ const path = require('path');
 const passport = require('passport');
 const session = require('express-session');
 const authRoutes = require('./routes/auth');
+const axios = require('axios');
 
 // Charger les variables d'environnement
 const envPath = path.resolve(__dirname, '.env');
@@ -44,9 +45,9 @@ app.use(express.json());
 
 // Configurer la session
 const sessionMiddleware = session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  secret: process.env.SESSION_SECRET || 'secret',
   resave: false,
-  saveUninitialized: false,
+  saveUninitialized: true,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     maxAge: 24 * 60 * 60 * 1000 // 24 heures

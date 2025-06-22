@@ -47,6 +47,8 @@ const processUserProfile = async (profile, done) => {
     }
     
     try {
+      console.log(`Tentative d'authentification OAuth pour l'email: ${email} avec le provider: ${profile.provider}`);
+      
       // Utiliser le nouvel endpoint OAuth pour créer/mettre à jour l'utilisateur
       const response = await axios.post(`${DB_SERVICE_URL}/public/oauth`, {
         name: profile.displayName || `${profile.name?.givenName || ''} ${profile.name?.familyName || ''}`,
@@ -55,9 +57,18 @@ const processUserProfile = async (profile, done) => {
         oauthProviderId: profile.id
       });
       
+      console.log('Réponse du service de base de données pour OAuth:', response.data);
+      
       return done(null, response.data.user);
     } catch (error) {
       console.error('Erreur lors du traitement OAuth:', error.response?.data || error.message);
+      
+      // Afficher plus de détails sur l'erreur
+      if (error.response) {
+        console.error('Status:', error.response.status);
+        console.error('Données d\'erreur:', error.response.data);
+      }
+      
       return done(error, null);
     }
   } catch (error) {
