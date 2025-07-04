@@ -7,6 +7,9 @@ const passport = require('passport');
 const session = require('express-session');
 const authRoutes = require('./routes/auth');
 const axios = require('axios');
+const promBundle = require('express-prom-bundle');
+
+dotenv.config();
 
 // Charger les variables d'environnement
 const envPath = path.resolve(__dirname, '.env');
@@ -69,10 +72,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Routes principales (directement à la racine, sans préfixe)
-app.use('/', authRoutes);
-
-// Également exposer les routes avec le préfixe /api/auth pour la compatibilité avec Google OAuth
+// Routes principales - Nous utilisons un préfixe unique pour plus de clarté
 app.use('/api/auth', authRoutes);
 
 // Route de test pour la santé du service
@@ -84,6 +84,22 @@ app.get('/health', (req, res) => {
 app.use((err, req, res, next) => {
   console.error('Erreur non gérée:', err);
   res.status(500).json({ message: 'Erreur interne du serveur', error: err.message });
+});
+
+const metricsMiddleware = promBundle({
+  includeMethod: true,
+  includePath: true,
+  includeStatusCode: true,
+  includeUp: true,
+  customLabels: { project_name: 'authentification-service' }, // Remplacer par le nom du service
+  promClient: { collectDefaultMetrics: {} }
+});
+app.use(metricsMiddleware);
+
+// Route pour exposer les métriques Prometheus
+app.get('/metrics', (req, res) => {
+  res.set('Content-Type', 'text/plain');
+  res.end(promBundle.promClient.register.metrics());
 });
 
 // Démarrer le serveur

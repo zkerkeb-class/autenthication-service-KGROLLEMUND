@@ -2,50 +2,16 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
 const crypto = require('crypto');
-
+const dotenv = require('dotenv');
+dotenv.config();
 // Configuration des URLs de services
-const DB_SERVICE_URL = process.env.DB_SERVICE_URL || 'http://localhost:3004';
-const NOTIFICATION_SERVICE_URL = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3006';
+console.log('DB_SERVICE_URL here1:', process.env.DB_SERVICE_URL);
+console.log('NOTIFICATION_SERVICE_URL here1:', process.env.NOTIFICATION_SERVICE_URL);
+const DB_SERVICE_URL = process.env.DB_SERVICE_URL;
+const NOTIFICATION_SERVICE_URL = process.env.NOTIFICATION_SERVICE_URL;
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 const SALT_ROUNDS = 10;
 console.log('JWT_SECRET here2:', process.env.JWT_SECRET);
-
-/**
- * Formate et valide un numéro de téléphone au format international
- */
-const formatPhoneNumber = (phone) => {
-  if (!phone) return null;
-  
-  // Supprimer tous les espaces, tirets, points, parenthèses
-  let cleaned = phone.replace(/[\s\-\.\(\)]/g, '');
-  
-  // Si ça commence déjà par +, garder tel quel
-  if (cleaned.startsWith('+')) {
-    return cleaned;
-  }
-  
-  // Si ça commence par 0 (numéro français), remplacer par +33
-  if (cleaned.startsWith('0')) {
-    return '+33' + cleaned.substring(1);
-  }
-  
-  // Si ça commence par 33 (sans le +), ajouter le +
-  if (cleaned.startsWith('33')) {
-    return '+' + cleaned;
-  }
-  
-  // Si c'est un numéro à 10 chiffres qui commence par 6 ou 7 (mobile français)
-  if (cleaned.length === 10 && (cleaned.startsWith('6') || cleaned.startsWith('7'))) {
-    return '+33' + cleaned;
-  }
-  
-  // Pour les autres cas, ajouter un + si ce n'est que des chiffres
-  if (/^\d+$/.test(cleaned)) {
-    return '+' + cleaned;
-  }
-  
-  return cleaned;
-};
 
 /**
  * Inscription d'un nouvel utilisateur
@@ -55,7 +21,7 @@ exports.register = async (req, res) => {
     console.log('🔄 Début de l\'inscription d\'un nouvel utilisateur');
     console.log('Données reçues:', { ...req.body, password: '***HIDDEN***' });
     
-    const { name, email, password, phoneNumber, sector, specialties, yearsOfExperience } = req.body;
+    const { name, email, password, sector, specialties, yearsOfExperience } = req.body;
 
     if (!name || !email || !password) {
       console.log('❌ Validation échouée: champs manquants');
@@ -133,10 +99,6 @@ exports.register = async (req, res) => {
     const verificationToken = crypto.randomBytes(32).toString('hex');
     console.log('Token de vérification généré');
 
-    // Formater le numéro de téléphone au format international
-    const formattedPhoneNumber = formatPhoneNumber(phoneNumber);
-    console.log('Numéro de téléphone formaté:', phoneNumber, '->', formattedPhoneNumber);
-
     // Créer l'utilisateur
     const userData = {
       name,
@@ -144,12 +106,9 @@ exports.register = async (req, res) => {
       password: hashedPassword,
       isAdmin: false,
       isSubscribed: false,
-      oauthProvider: null,
-      oauthProviderId: null,
       verificationToken,
       isVerified: false,
-      sector: sector || null,
-      phoneNumber: formattedPhoneNumber
+      sector: sector || null
     };
     
     console.log('Tentative de création de l\'utilisateur avec les données:', { ...userData, password: '***HIDDEN***' });
@@ -196,7 +155,7 @@ exports.register = async (req, res) => {
       // Envoyer l'email de vérification
       try {
         console.log('Tentative d\'envoi de l\'email de vérification...');
-        await axios.post(`${NOTIFICATION_SERVICE_URL}/notifications/email-verification`, {
+        await axios.post(`${NOTIFICATION_SERVICE_URL}/email-verification`, {
           to: email,
           name: name,
           verificationToken: verificationToken,
@@ -208,25 +167,26 @@ exports.register = async (req, res) => {
         // On continue même si l'envoi échoue
       }
 
-      // Retourner les données utilisateur sans le mot de passe
-      const { password: _, ...userWithoutPassword } = newUser;
-      console.log('✅ Inscription terminée avec succès');
-      res.status(201).json({ 
-        message: 'Utilisateur créé avec succès. Veuillez vérifier votre email.',
-        user: userWithoutPassword,
-        token
+      // Retourner la réponse avec le token
+      res.status(201).json({
+        message: 'Utilisateur créé avec succès',
+        token,
+        user: {
+          id: newUser.id,
+          name: newUser.name,
+          email: newUser.email,
+          isAdmin: newUser.isAdmin,
+          isVerified: newUser.isVerified,
+          sector: newUser.sector
+        }
       });
-    } catch (createError) {
-      console.error('❌ Erreur lors de la création de l\'utilisateur:', createError.response?.data || createError.message);
-      if (createError.response) {
-        console.error('Status:', createError.response.status);
-        console.error('Données d\'erreur:', createError.response.data);
-      }
-      res.status(500).json({ message: 'Erreur lors de l\'inscription', details: createError.response?.data || createError.message });
+    } catch (error) {
+      console.error('❌ Erreur lors de la création de l\'utilisateur:', error.response?.data || error.message);
+      return res.status(500).json({ message: 'Erreur serveur lors de la création de l\'utilisateur' });
     }
   } catch (error) {
-    console.error('❌ Erreur globale lors de l\'inscription:', error);
-    res.status(500).json({ message: 'Erreur lors de l\'inscription' });
+    console.error('❌ Erreur non gérée lors de l\'inscription:', error);
+    res.status(500).json({ message: 'Erreur serveur lors de l\'inscription' });
   }
 };
 
@@ -399,7 +359,7 @@ exports.verifyEmail = async (req, res) => {
     // Envoyer une notification de bienvenue
     try {
       console.log(`📧 Envoi de l'email de bienvenue à ${email}`);
-      await axios.post(`${NOTIFICATION_SERVICE_URL}/notifications/welcome`, {
+      await axios.post(`${NOTIFICATION_SERVICE_URL}/welcome`, {
         to: email,
         name: user.name
       });
@@ -439,76 +399,218 @@ exports.verifyEmail = async (req, res) => {
 };
 
 /**
- * Demande de réinitialisation de mot de passe par SMS uniquement
+ * Demande de réinitialisation de mot de passe par email
  */
-exports.requestPasswordReset = async (req, res) => {
+exports.requestPasswordResetByEmail = async (req, res) => {
   try {
-    const { phoneNumber } = req.body;
+    console.log('🔄 Début de la demande de réinitialisation par email');
+    const { email } = req.body;
 
-    // Vérifier que le numéro de téléphone est fourni
-    if (!phoneNumber) {
-      return res.status(400).json({ message: 'Numéro de téléphone requis' });
+    // Vérifier que l'email est fourni
+    if (!email) {
+      console.log('❌ Email non fourni');
+      return res.status(400).json({ message: 'Email requis' });
     }
 
-    // Formater le numéro de téléphone
-    const formattedPhoneNumber = formatPhoneNumber(phoneNumber);
-    console.log('Numéro formaté pour recherche:', formattedPhoneNumber);
-
+    console.log(`🔍 Recherche de l'utilisateur avec l'email: ${email}`);
+    
     // Vérifier si l'utilisateur existe
     let user;
     try {
-      const userResponse = await axios.get(`${DB_SERVICE_URL}/api/users/phone/${formattedPhoneNumber}`, {
+      const userResponse = await axios.get(`${DB_SERVICE_URL}/api/users/email/${email}`, {
         headers: {
           'X-Service': 'auth-service',
           'Origin': 'http://localhost:3001'
         }
       });
-      user = userResponse.data;
+      
+      // Gérer le cas où la réponse est un tableau ou un objet unique
+      if (Array.isArray(userResponse.data)) {
+        // Trouver un utilisateur non-OAuth
+        user = userResponse.data.find(u => !u.oauthProvider);
+        if (!user) {
+          // Si tous les utilisateurs sont OAuth
+          const oauthUser = userResponse.data[0];
+          console.log(`⚠️ Compte OAuth trouvé (${oauthUser.oauthProvider}) pour cet email`);
+          return res.status(400).json({ 
+            message: `Ce compte utilise l'authentification via ${oauthUser.oauthProvider}. Le mot de passe ne peut pas être réinitialisé.` 
+          });
+        }
+      } else {
+        user = userResponse.data;
+      }
+      
+      console.log('✅ Utilisateur trouvé:', { id: user.id, email: user.email });
     } catch (error) {
       // Si l'utilisateur n'existe pas, on renvoie quand même un succès pour éviter la divulgation d'informations
       if (error.response && error.response.status === 404) {
-        return res.json({ message: 'Si ce numéro existe, un SMS de réinitialisation a été envoyé' });
+        console.log(`⚠️ Aucun utilisateur trouvé avec l'email: ${email}`);
+        return res.json({ message: 'Si cet email existe, un email de réinitialisation a été envoyé' });
       }
       throw error;
     }
 
     // Vérifier si c'est un compte OAuth (qui ne peut pas réinitialiser son mot de passe)
     if (user.oauthProvider) {
+      console.log(`⚠️ Compte OAuth (${user.oauthProvider}) - pas de réinitialisation possible`);
       return res.status(400).json({ 
         message: `Ce compte utilise l'authentification via ${user.oauthProvider}. Le mot de passe ne peut pas être réinitialisé.` 
       });
     }
 
-    // Générer un code court à 6 chiffres pour SMS
+    // Générer un code court à 6 chiffres pour l'email
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
     const resetTokenExpiry = new Date(Date.now() + 900000); // 15 minutes
+
+    console.log(`🔑 Code de réinitialisation généré: ${resetCode}`);
+    console.log(`⏱️ Expiration: ${resetTokenExpiry}`);
 
     // Mettre à jour l'utilisateur avec le code de réinitialisation
     await axios.put(`${DB_SERVICE_URL}/api/users/${user.id}`, {
       resetCode,
       resetTokenExpiry: resetTokenExpiry.toISOString()
     });
+    console.log('✅ Code de réinitialisation enregistré en base de données');
 
-    // Envoyer le SMS avec le code de réinitialisation
+    // Envoyer l'email avec le code de réinitialisation
     try {
-      await axios.post(`${NOTIFICATION_SERVICE_URL}/notifications/password-reset-sms`, {
-        to: formattedPhoneNumber,
+      console.log('Envoi de l\'email de réinitialisation...');
+      await axios.post(`${NOTIFICATION_SERVICE_URL}/password-reset-request`, {
+        to: email,
         name: user.name,
-        resetCode
+        resetToken,
+        resetTokenExpiry: resetTokenExpiry.toISOString()
       });
-      console.log(`✅ SMS de réinitialisation de mot de passe envoyé à ${formattedPhoneNumber}`);
+      console.log(`✅ Email de réinitialisation envoyé à ${email}`);
     } catch (notifError) {
-      console.error('❌ Erreur lors de l\'envoi du SMS de réinitialisation:', notifError);
+      console.error('❌ Erreur lors de l\'envoi de l\'email de réinitialisation:', notifError.response?.data || notifError.message);
       // On continue même si l'envoi échoue
     }
 
     res.json({ 
-      message: 'Si ce numéro existe, un SMS de réinitialisation a été envoyé'
+      message: 'Si cet email existe, un email de réinitialisation a été envoyé'
     });
     
   } catch (error) {
-    console.error('❌ Erreur lors de la demande de réinitialisation:', error);
+    console.error('❌ Erreur lors de la demande de réinitialisation par email:', error.response?.data || error.message);
     res.status(500).json({ message: 'Erreur lors de la demande de réinitialisation' });
+  }
+};
+
+/**
+ * Vérification du code de réinitialisation
+ */
+exports.verifyResetCode = async (req, res) => {
+  try {
+    const { email, resetCode } = req.body;
+
+    // Vérifier que tous les champs requis sont présents
+    if (!email || !resetCode) {
+      return res.status(400).json({ message: 'Email et code de réinitialisation requis' });
+    }
+
+    // Rechercher l'utilisateur
+    let user;
+    try {
+      const userResponse = await axios.get(`${DB_SERVICE_URL}/api/users/email/${email}`, {
+        headers: {
+          'X-Service': 'auth-service'
+        }
+      });
+      
+      // Gérer le cas où la réponse est un tableau ou un objet unique
+      if (Array.isArray(userResponse.data)) {
+        user = userResponse.data.find(u => !u.oauthProvider);
+        if (!user) {
+          return res.status(400).json({ message: 'Utilisateur non trouvé ou utilise l\'authentification OAuth' });
+        }
+      } else {
+        user = userResponse.data;
+      }
+    } catch (error) {
+      if (error.response && error.response.status === 404) {
+        return res.status(404).json({ message: 'Utilisateur non trouvé' });
+      }
+      throw error;
+    }
+
+    // Vérifier si le code est valide et non expiré
+    if (!user.resetCode || user.resetCode !== resetCode) {
+      return res.status(400).json({ message: 'Code de réinitialisation invalide' });
+    }
+
+    if (!user.resetTokenExpiry || new Date(user.resetTokenExpiry) < new Date()) {
+      return res.status(400).json({ message: 'Code de réinitialisation expiré' });
+    }
+
+    // Générer un token temporaire pour la réinitialisation du mot de passe
+    const tempToken = jwt.sign(
+      { userId: user.id, purpose: 'password-reset' },
+      JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    res.json({
+      message: 'Code de réinitialisation valide',
+      tempToken,
+      userId: user.id
+    });
+  } catch (error) {
+    console.error('Erreur lors de la vérification du code:', error);
+    res.status(500).json({ message: 'Erreur lors de la vérification du code' });
+  }
+};
+
+/**
+ * Réinitialisation du mot de passe avec un code
+ */
+exports.resetPasswordWithCode = async (req, res) => {
+  try {
+    const { token, userId, password } = req.body;
+
+    // Vérifier que tous les champs requis sont présents
+    if (!token || !userId || !password) {
+      return res.status(400).json({ message: 'Token, userId et mot de passe requis' });
+    }
+
+    // Vérifier le token temporaire
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+      
+      if (decoded.purpose !== 'password-reset' || decoded.userId !== userId) {
+        return res.status(400).json({ message: 'Token invalide' });
+      }
+    } catch (jwtError) {
+      return res.status(400).json({ message: 'Token invalide ou expiré' });
+    }
+
+    // Hasher le nouveau mot de passe
+    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+    // Mettre à jour le mot de passe et réinitialiser les champs de réinitialisation
+    await axios.put(`${DB_SERVICE_URL}/api/users/${userId}`, {
+      password: hashedPassword,
+      resetCode: null,
+      resetTokenExpiry: null
+    });
+
+    // Envoyer une notification de confirmation de changement de mot de passe
+    try {
+      console.log('Envoi de la confirmation de changement de mot de passe...');
+      await axios.post(`${NOTIFICATION_SERVICE_URL}/password-reset-success`, {
+        to: user.email,
+        name: user.name
+      });
+    } catch (notifError) {
+      console.error('❌ Erreur lors de l\'envoi de la notification de confirmation de changement de mot de passe:', notifError.response?.data || notifError.message);
+      // On continue même si l'envoi échoue
+    }
+
+    res.json({ message: 'Mot de passe réinitialisé avec succès' });
+  } catch (error) {
+    console.error('Erreur lors de la réinitialisation du mot de passe:', error);
+    res.status(500).json({ message: 'Erreur lors de la réinitialisation du mot de passe' });
   }
 };
 
@@ -640,137 +742,5 @@ exports.logout = async (req, res) => {
       message: 'Erreur lors de la déconnexion',
       error: error.message
     });
-  }
-};
-
-/**
- * Vérification du code de réinitialisation reçu par SMS
- */
-exports.verifyResetCode = async (req, res) => {
-  try {
-    const { phoneNumber, resetCode } = req.body;
-
-    if (!phoneNumber || !resetCode) {
-      return res.status(400).json({ message: 'Numéro de téléphone et code de réinitialisation requis' });
-    }
-
-    console.log(`🔍 Vérification du code de réinitialisation pour le numéro ${phoneNumber}`);
-
-    // Vérifier si l'utilisateur existe
-    let user;
-    try {
-      const userResponse = await axios.get(`${DB_SERVICE_URL}/api/users/phone/${phoneNumber}`, {
-        headers: {
-          'X-Service': 'auth-service',
-          'Origin': 'http://localhost:3001'
-        }
-      });
-      user = userResponse.data;
-    } catch (error) {
-      if (error.response && error.response.status === 404) {
-        return res.status(404).json({ message: 'Utilisateur non trouvé' });
-      }
-      throw error;
-    }
-
-    // Vérifier si le code correspond et n'est pas expiré
-    if (user.resetCode !== resetCode) {
-      return res.status(400).json({ message: 'Code de réinitialisation invalide' });
-    }
-
-    const now = new Date();
-    const resetTokenExpiry = new Date(user.resetTokenExpiry);
-    if (resetTokenExpiry < now) {
-      return res.status(400).json({ message: 'Code de réinitialisation expiré' });
-    }
-
-    // Générer un token temporaire pour autoriser la réinitialisation
-    const tempToken = jwt.sign(
-      { userId: user.id, phoneNumber, purpose: 'reset-password' },
-      JWT_SECRET,
-      { expiresIn: '15m' }
-    );
-
-    res.json({ 
-      message: 'Code de réinitialisation valide',
-      tempToken,
-      userId: user.id
-    });
-    
-  } catch (error) {
-    console.error('❌ Erreur lors de la vérification du code de réinitialisation:', error);
-    res.status(500).json({ message: 'Erreur lors de la vérification du code de réinitialisation' });
-  }
-};
-
-/**
- * Réinitialisation du mot de passe avec code SMS
- */
-exports.resetPasswordWithCode = async (req, res) => {
-  try {
-    const { tempToken, userId, password } = req.body;
-
-    if (!tempToken || !userId || !password) {
-      return res.status(400).json({ message: 'Token temporaire, ID utilisateur et nouveau mot de passe requis' });
-    }
-
-    // Vérifier le token temporaire
-    let decoded;
-    try {
-      decoded = jwt.verify(tempToken, JWT_SECRET);
-      
-      // Vérifier que le token est bien pour la réinitialisation de mot de passe
-      if (decoded.purpose !== 'reset-password' || decoded.userId !== userId) {
-        return res.status(400).json({ message: 'Token temporaire invalide' });
-      }
-    } catch (jwtError) {
-      return res.status(400).json({ message: 'Token temporaire invalide ou expiré' });
-    }
-
-    // Vérifier si l'utilisateur existe
-    let user;
-    try {
-      const userResponse = await axios.get(`${DB_SERVICE_URL}/api/users/${userId}`, {
-        headers: {
-          'X-Service': 'auth-service',
-          'Origin': 'http://localhost:3001'
-        }
-      });
-      user = userResponse.data;
-    } catch (error) {
-      if (error.response && error.response.status === 404) {
-        return res.status(404).json({ message: 'Utilisateur non trouvé' });
-      }
-      throw error;
-    }
-
-    // Hasher le nouveau mot de passe
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Mettre à jour l'utilisateur
-    await axios.put(`${DB_SERVICE_URL}/api/users/${userId}`, {
-      password: hashedPassword,
-      resetToken: null,
-      resetCode: null,
-      resetTokenExpiry: null
-    });
-
-    // Envoyer une notification de confirmation
-    try {
-      await axios.post(`${NOTIFICATION_SERVICE_URL}/notifications/password-changed`, {
-        to: user.email,
-        name: user.name
-      });
-      console.log(`✅ Email de confirmation de changement de mot de passe envoyé à ${user.email}`);
-    } catch (notifError) {
-      console.error('❌ Erreur lors de l\'envoi de l\'email de confirmation:', notifError);
-      // On continue même si l'envoi échoue
-    }
-
-    res.json({ message: 'Mot de passe réinitialisé avec succès' });
-    
-  } catch (error) {
-    console.error('❌ Erreur lors de la réinitialisation du mot de passe:', error);
-    res.status(500).json({ message: 'Erreur lors de la réinitialisation du mot de passe' });
   }
 };

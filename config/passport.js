@@ -8,9 +8,7 @@ const dotenv = require('dotenv');
 dotenv.config(); 
 
 // URL du service de base de données
-const DB_SERVICE_URL = process.env.DB_SERVICE_URL || 'http://localhost:3004';
-
-
+const DB_SERVICE_URL = process.env.DB_SERVICE_URL;
 
 // Affichage des configurations (sans les secrets)
 console.log('Configuration OAuth:');
@@ -49,12 +47,12 @@ const processUserProfile = async (profile, done) => {
     try {
       console.log(`Tentative d'authentification OAuth pour l'email: ${email} avec le provider: ${profile.provider}`);
       
-      // Utiliser le nouvel endpoint OAuth pour créer/mettre à jour l'utilisateur
-      const response = await axios.post(`${DB_SERVICE_URL}/public/oauth`, {
+      // Utiliser le nouvel endpoint Account pour créer/mettre à jour l'utilisateur
+      const response = await axios.post(`${DB_SERVICE_URL}/api/accounts/oauth/user`, {
         name: profile.displayName || `${profile.name?.givenName || ''} ${profile.name?.familyName || ''}`,
         email,
-        oauthProvider: profile.provider,
-        oauthProviderId: profile.id
+        provider: profile.provider,
+        providerAccountId: profile.id
       });
       
       console.log('Réponse du service de base de données pour OAuth:', response.data);
