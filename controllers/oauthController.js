@@ -41,22 +41,61 @@ const linkedinCallback = (req, res, next) => {
   })(req, res, next);
 };
 
+// Fonction utilitaire pour renvoyer une page de succès qui gère le token côté client
+const sendOAuthSuccessPage = (req, res) => {
+  const token = generateToken(req.user);
+  const user = req.user;
+  const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+
+  // Renvoyer une page HTML avec un script pour stocker le token et rediriger
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Authentification en cours...</title>
+      <script>
+        // Fonction pour créer un cookie
+        function setCookie(name, value, days) {
+          let expires = "";
+          if (days) {
+            const date = new Date();
+            date.setTime(date.getTime() + (days*24*60*60*1000));
+            expires = "; expires=" + date.toUTCString();
+          }
+          document.cookie = name + "=" + (value || "")  + expires + "; path=/; SameSite=Lax";
+        }
+
+        try {
+          // Stocker le token dans le localStorage
+          localStorage.setItem('token', '${token}');
+
+          // Stocker l'état de complétion du profil dans un cookie pour le middleware
+          setCookie('isProfileCompleted', '${user.isProfileCompleted ? 'true' : 'false'}', 1);
+          setCookie('token', '${token}', 1);
+
+
+          // Décider de la redirection vers l'URL absolue du client
+          const targetUrl = ${user.isProfileCompleted} ? \`\${'${clientUrl}'}/\` : \`\${'${clientUrl}'}/complete-profile\`;
+          
+          // Rediriger
+          window.location.replace(targetUrl);
+        } catch (e) {
+          console.error("Erreur lors de la configuration de l'authentification:", e);
+          // Afficher un message d'erreur si quelque chose ne va pas
+          document.body.innerHTML = "Une erreur est survenue. Veuillez réessayer.";
+        }
+      </script>
+    </head>
+    <body>
+      <p>Finalisation de votre connexion...</p>
+    </body>
+    </html>
+  `);
+};
+
 // Fonction utilitaire pour gérer les callbacks OAuth
 const handleOAuthCallback = (req, res) => {
-  // Générer un JWT
-  const token = generateToken(req.user);
-  
-  // Encoder les données utilisateur pour les inclure dans l'URL
-  const userData = encodeURIComponent(JSON.stringify({
-    id: req.user.id,
-    name: req.user.name,
-    email: req.user.email,
-    isProfileCompleted: req.user.isProfileCompleted || false,
-    sector: req.user.sector || null
-  }));
-  
-  // Rediriger vers le front-end avec le token et les données utilisateur
-  res.redirect(`${process.env.CLIENT_URL}/oauth-callback?token=${token}&userData=${userData}`);
+  sendOAuthSuccessPage(req, res);
 };
 
 module.exports = {

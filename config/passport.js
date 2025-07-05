@@ -27,7 +27,7 @@ passport.serializeUser((user, done) => {
 passport.deserializeUser(async (id, done) => {
   try {
     // Récupérer l'utilisateur depuis le service de base de données
-    const response = await axios.get(`${DB_SERVICE_URL}/users/${id}`);
+    const response = await axios.get(`${DB_SERVICE_URL}/api/users/${id}`);
     done(null, response.data);
   } catch (error) {
     done(error, null);

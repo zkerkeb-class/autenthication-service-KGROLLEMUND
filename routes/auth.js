@@ -43,7 +43,7 @@ const generateToken = (user) => {
 };
 
 // Vérification du token
-router.get('/verify', authenticateJWT, tokenController.verifyToken);
+router.get('/verify', authController.verify);
 
 // Routes OAuth Google
 router.get('/google', 

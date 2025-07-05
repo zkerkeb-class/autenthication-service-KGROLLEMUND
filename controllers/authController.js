@@ -744,3 +744,34 @@ exports.logout = async (req, res) => {
     });
   }
 };
+
+/**
+ * Vérifie le token JWT et retourne les informations de l'utilisateur
+ */
+exports.verify = async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ message: 'Accès refusé. Aucun token fourni.' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, JWT_SECRET);
+    
+    // Le token est valide, on récupère les infos utilisateur depuis le service BDD
+    const userResponse = await axios.get(`${DB_SERVICE_URL}/api/users/${decoded.userId}`);
+    
+    // Supprimer le mot de passe de la réponse
+    const { password: _, ...userWithoutPassword } = userResponse.data;
+
+    res.json({ user: userWithoutPassword });
+
+  } catch (error) {
+    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Token invalide ou expiré' });
+    }
+    console.error('Erreur lors de la vérification du token:', error);
+    res.status(500).json({ message: 'Erreur serveur lors de la vérification' });
+  }
+};
