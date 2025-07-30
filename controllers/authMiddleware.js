@@ -6,12 +6,9 @@ dotenv.config();
 const authenticateJWT = (req, res, next) => {
   const authHeader = req.headers.authorization;
   
-  console.log('Headers reçus:', req.headers);
-  console.log('Auth header:', authHeader);
   
   if (authHeader) {
     const token = authHeader.split(' ')[1];
-    console.log('Token extrait:', token);
     
     if (!token) {
       console.error('Format du token invalide');
@@ -29,7 +26,6 @@ const authenticateJWT = (req, res, next) => {
         return res.status(403).json({ message: 'Token invalide: userId manquant' });
       }
       
-      console.log('Token vérifié, utilisateur décodé:', user);
       req.user = user;
       next();
     });
@@ -41,8 +37,6 @@ const authenticateJWT = (req, res, next) => {
 
 // Générer un JWT
 const generateToken = (user) => {
-  console.log('Génération de token pour utilisateur:', user);
-  console.log('ID utilisateur:', user.id);
   
   // Préparer les données du payload
   const payload = { 
@@ -52,9 +46,7 @@ const generateToken = (user) => {
   // Ajouter le provider si disponible
   if (user.oauthProvider) {
     payload.oauthProvider = user.oauthProvider;
-    console.log('Provider ajouté au token:', user.oauthProvider);
   }
-  
   return jwt.sign(
     payload,
     process.env.JWT_SECRET || 'secret',
@@ -63,18 +55,16 @@ const generateToken = (user) => {
 };
 
 // Middleware pour vérifier si la stratégie OAuth est configurée
-const checkOAuthStrategy = (strategy) => {
-  return (req, res, next) => {
-    console.log(`Tentative d'authentification ${strategy}`);
-    if (!req.app.get('passport')._strategies[strategy.toLowerCase()]) {
-      return res.status(500).json({
-        message: 'Erreur de configuration',
-        error: `La stratégie d'authentification ${strategy} n'est pas configurée. Vérifiez vos variables d'environnement.`
-      });
+const checkOAuthStrategy = (strategy) => (req, res, next) => {
+    const a = process.env[`${strategy.toUpperCase()}_CLIENT_ID`];
+    const b = process.env[`${strategy.toUpperCase()}_CLIENT_SECRET`];
+  
+    if (a && b) {
+      return next();
     }
-    next();
+    console.warn(`WARN: Stratégie OAuth '${strategy}' non configurée (variables d'environnement manquantes)`);
+    res.status(501).send(`La stratégie d'authentification ${strategy} n'est pas configurée sur ce serveur.`);
   };
-};
 
 module.exports = {
   authenticateJWT,

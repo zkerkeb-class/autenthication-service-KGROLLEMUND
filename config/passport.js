@@ -10,14 +10,6 @@ dotenv.config();
 // URL du service de base de données
 const DB_SERVICE_URL = process.env.DB_SERVICE_URL;
 
-// Affichage des configurations (sans les secrets)
-console.log('Configuration OAuth:');
-console.log('- Google Client ID configuré:', !!process.env.GOOGLE_CLIENT_ID);
-console.log('- LinkedIn Client ID configuré:', !!process.env.LINKEDIN_CLIENT_ID);
-console.log('- GitHub Client ID configuré:', !!process.env.GITHUB_CLIENT_ID);
-
-
-
 // Sérialisation de l'utilisateur pour la session
 passport.serializeUser((user, done) => {
   done(null, user.id);
@@ -55,7 +47,7 @@ const processUserProfile = async (profile, done) => {
         providerAccountId: profile.id
       });
       
-      console.log('Réponse du service de base de données pour OAuth:', response.data);
+      // console.log('Réponse du service de base de données pour OAuth:', response.data);
       
       return done(null, response.data.user);
     } catch (error) {
@@ -115,12 +107,6 @@ passport.use(new LinkedInStrategy({
   profileFields: ['id', 'first-name', 'last-name', 'email-address'],
   state: true
 }, (req, accessToken, refreshToken, profile, done) => {
-  console.log('=== LINKEDIN DEBUG ===');
-  console.log('Request headers:', req.headers);
-  console.log('Access Token:', accessToken);
-  console.log('Refresh Token:', refreshToken);
-  console.log('Profile brut:', JSON.stringify(profile, null, 2));
-  console.log('=== END LINKEDIN DEBUG ===');
   
   if (linkedinClientID === 'test-client-id') {
     console.warn('⚠️ Utilisation d\'identifiants LinkedIn de test. L\'authentification ne fonctionnera pas réellement.');

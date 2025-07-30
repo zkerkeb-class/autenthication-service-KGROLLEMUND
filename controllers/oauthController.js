@@ -5,13 +5,13 @@ dotenv.config();
 
 // Callback pour l'authentification Google
 const googleCallback = (req, res) => {
-  console.log('Authentification Google réussie, utilisateur:', req.user);
+  console.log('Authentification Google réussie');
   handleOAuthCallback(req, res);
 };
 
 // Callback pour l'authentification GitHub
 const githubCallback = (req, res) => {
-  console.log('Authentification GitHub réussie, utilisateur:', req.user);
+  console.log('Authentification GitHub réussie');
   handleOAuthCallback(req, res);
 };
 
@@ -45,7 +45,7 @@ const linkedinCallback = (req, res, next) => {
 const sendOAuthSuccessPage = (req, res) => {
   const token = generateToken(req.user);
   const user = req.user;
-  const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+  const clientUrl = process.env.CLIENT_URL;
 
   // Renvoyer une page HTML avec un script pour stocker le token et rediriger
   res.send(`

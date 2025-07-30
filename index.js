@@ -33,9 +33,9 @@ const PORT = process.env.PORT || 3001;
 
 // Afficher les variables d'environnement importantes (sans les secrets)
 console.log('PORT:', PORT);
-console.log('CLIENT_URL:', process.env.CLIENT_URL || 'http://localhost:3000');
-console.log('AUTH_SERVICE_URL:', process.env.AUTH_SERVICE_URL || 'http://localhost:3001');
-console.log('DB_SERVICE_URL:', process.env.DB_SERVICE_URL || 'http://localhost:3004');
+console.log('CLIENT_URL:', process.env.CLIENT_URL);
+console.log('AUTH_SERVICE_URL:', process.env.AUTH_SERVICE_URL);
+console.log('DB_SERVICE_URL:', process.env.DB_SERVICE_URL);
 
 // Configurer les middlewares
 app.use(cors({

@@ -2,12 +2,6 @@ const OAuth2Strategy = require('passport-oauth2');
 const axios = require('axios');
 const util = require('util');
 
-/**
- * Stratégie LinkedIn compatible avec OpenID Connect
- * 
- * Cette stratégie permet d'utiliser les nouveaux scopes de LinkedIn (openid, profile, email)
- * tout en restant compatible avec Passport.js
- */
 class LinkedInOIDCStrategy extends OAuth2Strategy {
   constructor(options, verify) {
     options = options || {};
@@ -38,7 +32,6 @@ class LinkedInOIDCStrategy extends OAuth2Strategy {
   // Récupérer le profil utilisateur
   async userProfile(accessToken, done) {
     try {
-      console.log('Récupération du profil LinkedIn avec le token:', accessToken);
       
       const response = await axios.get(this._profileURL, {
         headers: {
@@ -51,9 +44,7 @@ class LinkedInOIDCStrategy extends OAuth2Strategy {
       if (!response || !response.data) {
         return done(new Error('Failed to fetch user profile'));
       }
-      
-      console.log('Profil LinkedIn reçu:', JSON.stringify(response.data, null, 2));
-      
+            
       // Créer un format de profil compatible avec passport
       const profile = {
         provider: 'linkedin',
